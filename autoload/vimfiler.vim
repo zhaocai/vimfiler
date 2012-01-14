@@ -84,8 +84,10 @@ function! vimfiler#default_settings()"{{{
 
   " Set autocommands.
   augroup vimfiler"{{{
-    autocmd WinEnter,BufWinEnter <buffer> call s:event_bufwin_enter()
-    autocmd WinLeave,BufWinLeave <buffer> call s:event_bufwin_leave()
+    autocmd WinEnter,BufWinEnter <buffer>
+          \ call s:event_bufwin_enter(bufnr(expand('<abuf>')))
+    autocmd WinLeave,BufWinLeave <buffer>
+          \ call s:event_bufwin_leave(bufnr(expand('<abuf>')))
     autocmd VimResized <buffer> call vimfiler#redraw_all_vimfiler()
   augroup end"}}}
 
@@ -320,11 +322,19 @@ function! vimfiler#redraw_prompt()"{{{
   let mask = !b:vimfiler.is_visible_dot_files && b:vimfiler.current_mask == '' ?
         \ '' : '[' . (b:vimfiler.is_visible_dot_files ? '.:' : '')
         \       . b:vimfiler.current_mask . ']'
-  call setline(1, printf('%s[Current]: %s:%s%s',
+
+  let dir = b:vimfiler.current_dir
+  if b:vimfiler.source ==# 'file'
+    let home = neocomplcache#util#substitute_path_separator(expand('~')).'/'
+    if stridx(dir, home) >= 0
+      let dir = '~/' . dir[len(home):]
+    endif
+  endif
+
+  call setline(1, printf('%s[in]: %s%s%s',
         \ (b:vimfiler.is_safe_mode ? '' : '! '),
-        \ b:vimfiler.source, 
-        \ unite#filters#converter_shortpath_abbr#convert(b:vimfiler.current_dir),
-        \ mask))
+        \ (b:vimfiler.source ==# 'file' ? '' : b:vimfiler.source.':'),
+        \ dir, mask))
   let &l:modifiable = modifiable_save
 endfunction"}}}
 function! vimfiler#system(...)"{{{
@@ -820,14 +830,20 @@ function! vimfiler#complete(arglead, cmdline, cursorpos)"{{{
 endfunction"}}}
 
 " Event functions.
-function! s:event_bufwin_enter()"{{{
-  if !exists('b:vimfiler')
+function! s:event_bufwin_enter(bufnr)"{{{
+  let vimfiler = getbufvar(a:bufnr, 'vimfiler')
+  if type(vimfiler) != type({})
     return
   endif
 
   if bufwinnr(s:last_vimfiler_bufnr) > 0
-        \ && s:last_vimfiler_bufnr != bufnr('%')
+        \ && s:last_vimfiler_bufnr != a:bufnr
     let b:vimfiler.another_vimfiler_bufnr = s:last_vimfiler_bufnr
+  endif
+
+  if bufwinnr(a:bufnr) != winnr()
+    let winnr = winnr()
+    execute bufwinnr(a:bufnr) 'wincmd w'
   endif
 
   if has('conceal')
@@ -852,13 +868,17 @@ function! s:event_bufwin_enter()"{{{
   if b:vimfiler.winwidth != winwidth
     call vimfiler#redraw_screen()
   endif
+
+  if exists('winnr')
+    execute winnr.'wincmd w'
+  endif
 endfunction"}}}
-function! s:event_bufwin_leave()"{{{
+function! s:event_bufwin_leave(bufnr)"{{{
   if !exists('b:vimfiler')
     return
   endif
 
-  let s:last_vimfiler_bufnr = bufnr('%')
+  let s:last_vimfiler_bufnr = a:bufnr
 endfunction"}}}
 
 function! vimfiler#_switch_vimfiler(bufnr, context, directory)"{{{
