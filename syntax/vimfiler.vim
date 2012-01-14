@@ -90,7 +90,6 @@ hi def link vimfilerMask Statement
 
 hi def link vimfilerSpecial Special
 hi vimfilerSpecialSafe guifg=red ctermfg=red
-
 hi def link vimfilerNonMark Special
 "hi vimfilerMarkedFile  gui=REVERSE term=REVERSE
 hi def link vimfilerMarkedFile Type

@@ -322,7 +322,9 @@ function! vimfiler#redraw_prompt()"{{{
         \       . b:vimfiler.current_mask . ']'
   call setline(1, printf('%s[Current]: %s:%s%s',
         \ (b:vimfiler.is_safe_mode ? '' : '! '),
-        \ b:vimfiler.source, b:vimfiler.current_dir, mask))
+        \ b:vimfiler.source, 
+        \ unite#filters#converter_shortpath_abbr#convert(b:vimfiler.current_dir),
+        \ mask))
   let &l:modifiable = modifiable_save
 endfunction"}}}
 function! vimfiler#system(...)"{{{
