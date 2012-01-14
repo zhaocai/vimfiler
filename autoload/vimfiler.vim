@@ -42,7 +42,6 @@ if s:exists_unite_version < 300
 endif"}}}
 
 let s:current_vimfiler = {}
-let s:use_current_vimfiler = 1
 let s:last_vimfiler_bufnr = -1
 let s:last_system_is_vimproc = -1
 
@@ -66,7 +65,7 @@ function! vimfiler#default_settings()"{{{
   setlocal noswapfile
   setlocal noreadonly
   setlocal nomodifiable
-  setlocal wrap
+  setlocal nowrap
   setlocal nofoldenable
   setlocal foldcolumn=0
   setlocal nolist
@@ -116,8 +115,7 @@ endfunction"}}}
 
 " vimfiler plugin utility functions."{{{
 function! vimfiler#get_current_vimfiler()"{{{
-  return exists('b:vimfiler') && !s:use_current_vimfiler ?
-        \ b:vimfiler : s:current_vimfiler
+  return exists('b:vimfiler') ? b:vimfiler : s:current_vimfiler
 endfunction"}}}
 function! vimfiler#set_current_vimfiler(vimfiler)"{{{
   let s:current_vimfiler = a:vimfiler
@@ -128,7 +126,7 @@ endfunction"}}}
 function! vimfiler#set_context(context)"{{{
   let old_context = vimfiler#get_context()
 
-  if exists('b:vimfiler') && !s:use_current_vimfiler
+  if exists('b:vimfiler')
     let b:vimfiler.context = a:context
   else
     let s:current_vimfiler.context = a:context
@@ -329,6 +327,10 @@ function! vimfiler#redraw_prompt()"{{{
     if stridx(dir, home) >= 0
       let dir = '~/' . dir[len(home):]
     endif
+  endif
+
+  if vimfiler#util#strchars(dir) > winwidth(0)
+    let dir = fnamemodify(dir, ':t')
   endif
 
   call setline(1, printf('%s[in]: %s%s%s',
@@ -688,11 +690,7 @@ function! vimfiler#get_print_lines(files)"{{{
         \ (is_simple ? s:min_padding_width : s:max_padding_width)
   if max_len > g:vimfiler_max_filename_width
     let max_len = g:vimfiler_max_filename_width
-  elseif !is_simple &&
-        \ max_len < g:vimfiler_min_filename_width
-    let max_len = g:vimfiler_min_filename_width
   endif
-  let max_len += 1
 
   " Print files.
   let lines = []
