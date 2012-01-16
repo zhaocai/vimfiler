@@ -1,7 +1,7 @@
 "=============================================================================
 " FILE: vimfiler.vim
 " AUTHOR: Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 15 Jan 2012.
+" Last Modified: 16 Jan 2012.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -141,7 +141,7 @@ function! vimfiler#create_filer(path, ...)"{{{
   let path = a:path
   if path == ''
     let path = vimfiler#util#substitute_path_separator(getcwd())
-  elseif path =~ '^[^a]*:'
+  elseif path =~ '^\A*:'
     let path = vimfiler#util#substitute_path_separator(
           \ fnamemodify(expand(path), ':p'))
   endif
@@ -177,7 +177,7 @@ function! vimfiler#create_filer(path, ...)"{{{
 endfunction"}}}
 function! vimfiler#switch_filer(path, ...)"{{{
   let path = a:path
-  if path =~ '^[^a]*:'
+  if path =~ '^\A*:'
     let path = vimfiler#util#substitute_path_separator(
           \ fnamemodify(expand(path), ':p'))
   endif
@@ -335,7 +335,7 @@ function! vimfiler#redraw_prompt()"{{{
 
   let dir = b:vimfiler.current_dir
   if b:vimfiler.source ==# 'file'
-    let home = neocomplcache#util#substitute_path_separator(expand('~')).'/'
+    let home = unite#util#substitute_path_separator(expand('~')).'/'
     if stridx(dir, home) >= 0
       let dir = '~/' . dir[len(home):]
     endif
@@ -639,7 +639,7 @@ function! vimfiler#parse_path(path)"{{{
     " Default source.
     let source_name = 'file'
     let source_arg = a:path
-    if source_arg =~ '^[^a]*:'
+    if source_arg =~ '^\A*:'
       let source_arg = vimfiler#util#substitute_path_separator(
             \ fnamemodify(expand(source_arg), ':p'))
     endif
@@ -849,12 +849,13 @@ endfunction"}}}
 function! s:event_bufwin_enter(bufnr)"{{{
   let vimfiler = getbufvar(a:bufnr, 'vimfiler')
   if type(vimfiler) != type({})
+        \ || bufwinnr(a:bufnr) < 1
     return
   endif
 
   if bufwinnr(s:last_vimfiler_bufnr) > 0
         \ && s:last_vimfiler_bufnr != a:bufnr
-    let b:vimfiler.another_vimfiler_bufnr = s:last_vimfiler_bufnr
+    let vimfiler.another_vimfiler_bufnr = s:last_vimfiler_bufnr
   endif
 
   if bufwinnr(a:bufnr) != winnr()
@@ -862,12 +863,16 @@ function! s:event_bufwin_enter(bufnr)"{{{
     execute bufwinnr(a:bufnr) 'wincmd w'
   endif
 
+  if !exists('b:vimfiler')
+    return
+  endif
+
   if has('conceal')
     setlocal conceallevel=3
     setlocal concealcursor=n
   endif
 
-  call vimfiler#set_current_vimfiler(b:vimfiler)
+  call vimfiler#set_current_vimfiler(vimfiler)
 
   let vimfiler = vimfiler#get_current_vimfiler()
   if !has_key(vimfiler, 'context')
@@ -881,7 +886,7 @@ function! s:event_bufwin_enter(bufnr)"{{{
   endif
 
   let winwidth = (winwidth(0)+1)/2*2
-  if b:vimfiler.winwidth != winwidth
+  if vimfiler.winwidth != winwidth
     call vimfiler#redraw_screen()
   endif
 

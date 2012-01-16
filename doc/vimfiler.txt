@@ -736,10 +736,16 @@ vimfiler/popd						*vimfiler-unite-action-vimfiler-popd*
 ==============================================================================
 CHANGELOG					*vimfiler-changelog*
 
+2012-01-16
+- Fixed vimfiler event error.
+- Fixed neocomplcache depends.
+
 2012-01-15
 - Fixed documentation.
 - Fixed redraw.
 - Fixed parse path.
+- Fixed alternate buffer.
+- Improved exrename highlight.
 
 2012-01-14
 - Improved prompt.
