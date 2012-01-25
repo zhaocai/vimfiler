@@ -1,7 +1,7 @@
 "=============================================================================
 " FILE: exrename.vim
 " AUTHOR: Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 15 Jan 2012.
+" Last Modified: 20 Jan 2012.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -28,13 +28,18 @@ function! vimfiler#exrename#create_buffer(files)"{{{
   let vimfiler_save = deepcopy(b:vimfiler)
   let bufnr = bufnr('%')
 
-  vsplit exrename
+  vsplit
+  call vimfiler#redraw_screen()
+  let prefix = vimfiler#util#is_win() ? '[exrename] - ' : '*exrename* - '
+  let prefix .= b:vimfiler.context.buffer_name
+  execute 'edit' prefix
 
   silent! highlight clear ExrenameModified
   silent! syntax clear ExrenameModified
   silent! syntax clear ExrenameOriginal
 
   setlocal buftype=acwrite
+  setlocal noswapfile
   let b:exrename = vimfiler_save
   let b:exrename.bufnr = bufnr
 
@@ -60,13 +65,18 @@ function! vimfiler#exrename#create_buffer(files)"{{{
   let b:exrename.current_files = []
   let b:exrename.current_filenames = []
   for file in a:files
-    let filename = file.vimfiler__filename
+    let filename = file.action__path
+    if stridx(filename, b:exrename.current_dir) == 0
+      let filename = filename[len(b:exrename.current_dir) :]
+    endif
+
     if file.vimfiler__is_directory
       let filename .= '/'
     endif
 
     execute 'syntax match ExrenameOriginal'
-          \ '/'.printf('^\%%%dl%s$', line('$'), escape(filename, '/')).'/'
+          \ '/'.printf('^\%%%dl%s$', line('$'),
+          \ escape(vimfiler#util#escape_pattern(filename), '/')).'/'
     call append('$', filename)
     call add(b:exrename.current_files, file)
     call add(b:exrename.current_filenames, filename)
@@ -85,6 +95,8 @@ function! s:exit()"{{{
     call s:custom_alternate_buffer()
   endif
   execute 'bdelete!' exrename_buf
+
+  call vimfiler#redraw_all_vimfiler()
 endfunction"}}}
 function! s:do_rename()"{{{
   if line('$') != len(b:exrename.current_filenames)
@@ -98,8 +110,10 @@ function! s:do_rename()"{{{
     let filename = b:exrename.current_filenames[linenr - 1]
     if filename !=# getline(linenr)
       let file = b:exrename.current_files[linenr - 1]
-      call unite#mappings#do_action('vimfiler__rename', [file],
-            \ {'action__filename' : getline(linenr)})
+      call unite#mappings#do_action('vimfiler__rename', [file], {
+            \ 'vimfiler__current_directory' : b:exrename.current_dir,
+            \ 'action__filename' : vimfiler#util#expand(getline(linenr)),
+            \ })
     endif
 
     let linenr += 1

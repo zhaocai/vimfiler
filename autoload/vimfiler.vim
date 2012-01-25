@@ -1,7 +1,7 @@
 "=============================================================================
 " FILE: vimfiler.vim
 " AUTHOR: Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 16 Jan 2012.
+" Last Modified: 24 Jan 2012.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -29,15 +29,13 @@
 try
   let s:exists_unite_version = unite#version()
 catch
-  echoerr v:errmsg
-  echoerr v:exception
-  echoerr 'Error occured while loading unite.vim.'
-  echoerr 'Please install unite.vim Ver.3.0 or above.'
+  echomsg 'Error occured while loading unite.vim.'
+  echomsg 'Please install unite.vim Ver.3.0 or above.'
   finish
 endtry
 if s:exists_unite_version < 300
-  echoerr 'Your unite.vim is too old.'
-  echoerr 'Please install unite.vim Ver.3.0 or above.'
+  echomsg 'Your unite.vim is too old.'
+  echomsg 'Please install unite.vim Ver.3.0 or above.'
   finish
 endif"}}}
 
@@ -141,15 +139,15 @@ function! vimfiler#create_filer(path, ...)"{{{
   let path = a:path
   if path == ''
     let path = vimfiler#util#substitute_path_separator(getcwd())
-  elseif path =~ '^\A*:'
+  elseif vimfiler#util#is_win_path(path)
     let path = vimfiler#util#substitute_path_separator(
-          \ fnamemodify(expand(path), ':p'))
+          \ fnamemodify(vimfiler#util#expand(path), ':p'))
   endif
 
   let context = vimfiler#init_context(get(a:000, 0, {}))
   if &l:modified && !&l:hidden
     " Split automatically.
-    let context.is_switch = 1
+    let context.split = 1
   endif
 
   " Create new buffer name.
@@ -177,15 +175,15 @@ function! vimfiler#create_filer(path, ...)"{{{
 endfunction"}}}
 function! vimfiler#switch_filer(path, ...)"{{{
   let path = a:path
-  if path =~ '^\A*:'
+  if vimfiler#util#is_win_path(path)
     let path = vimfiler#util#substitute_path_separator(
-          \ fnamemodify(expand(path), ':p'))
+          \ fnamemodify(vimfiler#util#expand(path), ':p'))
   endif
 
   let context = vimfiler#init_context(get(a:000, 0, {}))
   if &l:modified && !&l:hidden
     " Split automatically.
-    let context.is_switch = 1
+    let context.split = 1
   endif
 
   if context.toggle && !context.create
@@ -624,7 +622,7 @@ function! vimfiler#set_variables(variables)"{{{
     let variables_save[key] = save_value
     execute 'let' key '= value'
   endfor
-  
+
   return variables_save
 endfunction"}}}
 function! vimfiler#restore_variables(variables_save)"{{{
@@ -633,18 +631,20 @@ function! vimfiler#restore_variables(variables_save)"{{{
   endfor
 endfunction"}}}
 function! vimfiler#parse_path(path)"{{{
-  let source_name = matchstr(a:path, '^\h[^:]*\ze:')
+  let path = a:path
+
+  let source_name = matchstr(path, '^\h[^:]*\ze:')
   if (vimfiler#util#is_win() && len(source_name) == 1)
         \ || source_name == ''
     " Default source.
     let source_name = 'file'
-    let source_arg = a:path
-    if source_arg =~ '^\A*:'
+    let source_arg = path
+    if vimfiler#util#is_win_path(source_arg)
       let source_arg = vimfiler#util#substitute_path_separator(
             \ fnamemodify(expand(source_arg), ':p'))
     endif
   else
-    let source_arg = a:path[len(source_name)+1 :]
+    let source_arg = path[len(source_name)+1 :]
   endif
 
   let source_args = source_arg  == '' ? [] :
@@ -850,6 +850,7 @@ function! s:event_bufwin_enter(bufnr)"{{{
   let vimfiler = getbufvar(a:bufnr, 'vimfiler')
   if type(vimfiler) != type({})
         \ || bufwinnr(a:bufnr) < 1
+        \ || count(map(range(1, winnr('$')), 'winbufnr(v:val)'), a:bufnr) > 1
     return
   endif
 

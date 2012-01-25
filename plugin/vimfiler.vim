@@ -1,7 +1,7 @@
 "=============================================================================
-" FILE: vimshell.vim
+" FILE: vimfiler.vim
 " AUTHOR: Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 14 Jan 2012.
+" Last Modified: 24 Jan 2012.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -25,15 +25,29 @@
 "=============================================================================
 
 if v:version < 702
-  echoerr 'vimfiler does not work this version of Vim "' . v:version . '".'
+  echomsg 'vimfiler does not work this version of Vim "' . v:version . '".'
   finish
 elseif exists('g:loaded_vimfiler')
   finish
 elseif $SUDO_USER != ''
-  echoerr '"sudo vim" is detected. Please use sudo.vim or other plugins instead.'
-  echoerr 'vimfiler is disabled.'
+  echomsg '"sudo vim" is detected. Please use sudo.vim or other plugins instead.'
+  echomsg 'vimfiler is disabled.'
   finish
 endif
+
+" Check unite.vim."{{{
+try
+  let s:exists_unite_version = unite#version()
+catch
+  echomsg 'Error occured while loading unite.vim.'
+  echomsg 'Please install unite.vim Ver.3.0 or above.'
+  finish
+endtry
+if s:exists_unite_version < 300
+  echomsg 'Your unite.vim is too old.'
+  echomsg 'Please install unite.vim Ver.3.0 or above.'
+  finish
+endif"}}}
 
 let s:save_cpo = &cpo
 set cpo&vim
@@ -166,8 +180,7 @@ function! s:browse_check(path)"{{{
   if fnamemodify(path, ':t') ==# '~'
     let path = '~'
   endif
-  if isdirectory(expand(
-        \ vimfiler#util#escape_file_searching(path)))
+  if isdirectory(vimfiler#util#expand(path))
         \ && &filetype != 'vimfiler'
     call vimfiler#handler#_event_handler('BufReadCmd')
   endif

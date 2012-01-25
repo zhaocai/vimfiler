@@ -736,6 +736,29 @@ vimfiler/popd						*vimfiler-unite-action-vimfiler-popd*
 ==============================================================================
 CHANGELOG					*vimfiler-changelog*
 
+2012-01-24
+- Improved vimfiler check.
+- Fixed split automatically.
+
+2012-01-23
+- Fixed switch_to_other_window error.
+- Improved split edit file.
+- Fixed write problem.
+
+2012-01-22
+- set fileencoding.
+
+2012-01-20
+- Fixed exrename problem.
+- Improved exrename behavior.
+
+2012-01-18
+- Fixed winwidth problem.
+
+2012-01-17
+- Improved documentation.
+- Fixed for Windows UNC path(mattn).
+
 2012-01-16
 - Fixed vimfiler event error.
 - Fixed neocomplcache depends.
