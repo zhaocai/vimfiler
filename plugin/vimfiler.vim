@@ -1,7 +1,7 @@
 "=============================================================================
 " FILE: vimfiler.vim
 " AUTHOR: Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 24 Jan 2012.
+" Last Modified: 10 Apr 2012.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -24,14 +24,15 @@
 " }}}
 "=============================================================================
 
-if v:version < 702
+if exists('g:loaded_vimfiler')
+  finish
+elseif v:version < 702
   echomsg 'vimfiler does not work this version of Vim "' . v:version . '".'
   finish
-elseif exists('g:loaded_vimfiler')
-  finish
-elseif $SUDO_USER != ''
-  echomsg '"sudo vim" is detected. Please use sudo.vim or other plugins instead.'
-  echomsg 'vimfiler is disabled.'
+elseif $SUDO_USER != '' && $USER !=# $SUDO_USER
+      \ && $HOME !=# expand('~'.$USER)
+  echoerr '"sudo vim" and $HOME is not same to /root are detected.'
+        \.'Please use sudo.vim plugin instead of sudo command or set always_set_home in sudoers.'
   finish
 endif
 
@@ -73,16 +74,6 @@ let g:vimfiler_directory_display_top =
       \ get(g:, 'vimfiler_directory_display_top', 1)
 let g:vimfiler_split_rule =
       \ get(g:, 'vimfiler_split_rule', 'topleft')
-let g:vimfiler_detect_drives =
-      \ get(g:, 'vimfiler_detect_drives', (has('win32') || has('win64')) ? [
-      \     'A:/', 'B:/', 'C:/', 'D:/', 'E:/', 'F:/', 'G:/',
-      \     'H:/', 'I:/', 'J:/', 'K:/', 'L:/', 'M:/', 'N:/',
-      \     'O:/', 'P:/', 'Q:/', 'R:/', 'S:/', 'T:/', 'U:/',
-      \     'V:/', 'W:/', 'X:/', 'Y:/', 'Z:/'
-      \ ] : (has('macunix') || system('uname') =~? '^darwin') ?
-      \ split(glob('/Volumes/*'), '\n') :
-      \ split(glob('/mnt/*'), '\n') + split(glob('/media/*'), '\n'))
-
 let g:vimfiler_max_directories_history =
       \ get(g:, 'vimfiler_max_directories_history', 50)
 let g:vimfiler_safe_mode_by_default =
@@ -99,10 +90,14 @@ let g:vimfiler_file_icon =
       \ get(g:, 'vimfiler_file_icon', '-')
 let g:vimfiler_marked_file_icon =
       \ get(g:, 'vimfiler_marked_file_icon', '*')
+let g:vimfiler_enable_auto_cd =
+      \ get(g:, 'vimfiler_enable_auto_cd', 0)
 let g:vimfiler_data_directory =
-      \ get(g:, 'vimfiler_data_directory', expand('~/.vimfiler'))
-if !isdirectory(fnamemodify(g:vimfiler_data_directory, ':p'))
-  call mkdir(fnamemodify(g:vimfiler_data_directory, ':p'))
+      \ substitute(fnamemodify(get(
+      \   g:, 'vimfiler_data_directory', '~/.vimfiler'),
+      \  ':p'), '\\', '/', 'g')
+if !isdirectory(g:vimfiler_data_directory)
+  call mkdir(g:vimfiler_data_directory)
 endif
 
 " Set extensions.
@@ -112,7 +107,7 @@ let g:vimfiler_extensions =
 
 " Plugin keymappings"{{{
 nnoremap <silent> <Plug>(vimfiler_split_switch)
-      \ :<C-u>s:call_vimfiler({ 'split' : 1 }, '')<CR>
+      \ :<C-u><SID>call_vimfiler({ 'split' : 1 }, '')<CR>
 nnoremap <silent> <Plug>(vimfiler_split_create)
       \ :<C-u>VimFilerSplit<CR>
 nnoremap <silent> <Plug>(vimfiler_switch)
@@ -181,7 +176,7 @@ function! s:browse_check(path)"{{{
     let path = '~'
   endif
   if isdirectory(vimfiler#util#expand(path))
-        \ && &filetype != 'vimfiler'
+        \ && &filetype !=# 'vimfiler'
     call vimfiler#handler#_event_handler('BufReadCmd')
   endif
 endfunction"}}}

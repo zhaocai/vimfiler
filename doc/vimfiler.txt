@@ -122,6 +122,10 @@ COMMANDS 					*vimfiler-commands*
 		-split
 		Split vimfiler buffer.
 
+						*unite-options-horizontal*
+		-horizontal
+		Split horizontally.
+
 						*unite-options-double*
 		-double
 		Open vimfiler buffers in double mode.
@@ -129,6 +133,12 @@ COMMANDS 					*vimfiler-commands*
 						*vimfiler-options-create*
 		-create
 		Create new vimfiler buffer.
+
+						*unite-options-auto-cd*
+		-auto-cd
+		Enable auto cd behavior.
+		If omit it, use |g:vimfiler_enable_auto_cd|.
+		Note: This option works in file source.
 
 :VimFilerCreate [{options}...] [{path}]		*:VimFilerCreate*
 		Equivalent to |:VimFiler| except that it creates a new vimfiler
@@ -193,6 +203,8 @@ vimfiler#smart_cursor_map({directory-map}, {file-map})
 		nmap <buffer><expr> e vimfiler#smart_cursor_map(
 				\  "\<Plug>(vimfiler_cd_file)",
 				\  "\<Plug>(vimfiler_edit_file)")
+
+vimfiler#set_execute_file({exts}, {command})	*vimfiler#set_execute_file()*
 
 ------------------------------------------------------------------------------
 VARIABLES 					*vimfiler-variables*
@@ -313,6 +325,14 @@ g:vimfiler_data_directory			*g:vimfiler_data_directory*
 		the directory will be automatically generated.
 		
 		Default value is expand('~/.vimfiler'); the absolute path of it.
+
+g:vimfiler_enable_auto_cd			*g:vimfiler_enable_auto_cd*
+		This variable controls whether vimfiler change Vim current
+		directory using |g:unite_kind_openable_lcd_command|
+		automatically.
+		Note: This variable works in file source.
+		
+		Default value is 0
 
 SOURCES VARIABLES 				*vimfiler-sources-variables*
 
@@ -555,7 +575,8 @@ Normal mode key mappings.
 
 <Plug>(vimfiler_cd_vim_current_dir)		*<Plug>(vimfiler_cd_vim_current_dir)*
 <Plug>(vimfiler_cd)				*<Plug>(vimfiler_cd)*
-		Change system current directory to vimfiler current directory.
+		Change system current directory to vimfiler current directory
+		using |g:unite_kind_openable_lcd_command|.
 		Note: |<Plug>(vimfiler_cd)| is obsolute name.
 
 <Plug>(vimfiler_cd_file)			*<Plug>(vimfiler_cd_file)*
@@ -666,6 +687,7 @@ EXAMPLES					*vimfiler-examples*
 >
 	call vimfiler#set_execute_file('vim', 'vim')
 	call vimfiler#set_execute_file('txt', 'notepad')
+	call vimfiler#set_execute_file('c', ['vim', 'notepad'])
 	
 	" Edit file by tabedit.
 	"let g:vimfiler_edit_action = 'tabopen'
@@ -735,6 +757,72 @@ vimfiler/popd						*vimfiler-unite-action-vimfiler-popd*
 
 ==============================================================================
 CHANGELOG					*vimfiler-changelog*
+
+2012-04-10
+- Fixed browse check.
+- Improved sudo check.
+- Fixed choose action error.
+
+2012-03-31
+- Fixed for cmdwin.
+- Fixed variables initialization.
+
+2012-03-26
+- Fixed edit binary file.
+
+2012-03-20
+- Fixed expand().
+
+2012-03-15
+- Fixed expand().
+
+2012-03-07
+- Updated vital.
+
+2012-03-06
+- Fixed create vimfiler buffer behavior.
+
+2012-03-05
+- Improved version check.
+
+2012-03-03
+- Improved new file behavior.
+- Improved alternate buffer.
+
+2012-02-25
+- Fixed redraw problem.
+
+2012-02-20
+- Fixed vimfiler create buffer.
+
+2012-02-14
+- Improved helper functions.
+
+2012-02-13
+- Fixed exrename.
+
+2012-02-12
+- Refactored initialize context.
+
+2012-02-11
+- Fixed check buflisted.
+- Refactored is_windows.
+
+2012-02-10
+- Fixed <Plug>(vimfiler_cd_vim_current_dir).
+- Added -horizontal option.
+- Fixed default explorer problem.
+- Fixed handler.
+- Added g:vimfiler_enable_auto_cd option.
+
+2012-02-01
+- Improved g:vimfiler_detect_drives initialize timing.
+
+2012-01-31
+- Fixed search buffer name.
+
+2012-01-26
+- Fixed winfixwidth problem.
 
 2012-01-24
 - Improved vimfiler check.

@@ -1,7 +1,7 @@
 "=============================================================================
 " FILE: util.vim
 " AUTHOR: Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 20 Jan 2012.
+" Last Modified: 31 Mar 2012.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -50,7 +50,7 @@ endfunction
 function! vimfiler#util#wcswidth(...)
   return call(s:V.wcswidth, a:000)
 endfunction
-function! vimfiler#util#is_win(...)
+function! vimfiler#util#is_windows(...)
   return call(s:V.is_windows, a:000)
 endfunction
 function! vimfiler#util#is_win_path(path)
@@ -99,23 +99,49 @@ function! vimfiler#util#escape_file_searching(...)
   return call(s:V.escape_file_searching, a:000)
 endfunction
 
+function! vimfiler#util#is_cmdwin()"{{{
+  try
+    noautocmd wincmd p
+  catch /^Vim\%((\a\+)\)\=:E11:/
+    return 1
+  endtry
+
+  silent! noautocmd wincmd p
+  return 0
+endfunction"}}}
+
 function! vimfiler#util#expand(path)"{{{
-  return expand(escape(a:path, unite#util#is_win() ?
-        \ '*?"={}' : '*?"={}[]'))
+  return s:V.substitute_path_separator(
+        \ (a:path =~ '^\~') ? substitute(a:path, '^\~', expand('~'), '') :
+        \ (a:path =~ '^\$\h\w*') ? substitute(a:path,
+        \               '^\$\h\w*', '\=eval(submatch(0))', '') :
+        \ a:path)
+endfunction"}}}
+function! vimfiler#util#set_default_dictionary_helper(variable, keys, value)"{{{
+  for key in split(a:keys, '\s*,\s*')
+    if !has_key(a:variable, key)
+      let a:variable[key] = a:value
+    endif
+  endfor
+endfunction"}}}
+function! vimfiler#util#set_dictionary_helper(variable, keys, value)"{{{
+  for key in split(a:keys, '\s*,\s*')
+    let a:variable[key] = a:value
+  endfor
 endfunction"}}}
 
 function! vimfiler#util#alternate_buffer()"{{{
-  if getbufvar('#', "&filetype") !=# "vimfiler"
-        \ && s:buflisted('#')
+  if getbufvar('#', '&filetype') !=# 'vimfiler'
+        \ && s:buflisted(bufnr('#'))
     buffer #
     return
   endif
 
   let listed_buffer = filter(range(1, bufnr('$')),
-        \ 's:buflisted(v:val) &&
-        \  (v:val == bufnr("%") || getbufvar(v:val, "&filetype") !=# "vimfiler")')
+        \ "s:buflisted(v:val) &&
+        \  (v:val == bufnr('%') || getbufvar(v:val, '&filetype') !=# 'vimfiler')")
   let current = index(listed_buffer, bufnr('%'))
-  if current < 0 || len(listed_buffer) < 3
+  if current < 0 || len(listed_buffer) < 2
     enew
     return
   endif

@@ -1,7 +1,7 @@
 "=============================================================================
 " FILE: vimfiler.vim
 " AUTHOR: Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 24 Jan 2012.
+" Last Modified: 31 Mar 2012.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -49,8 +49,8 @@ let s:vimfiler_current_histories = []
 
 let s:vimfiler_options = [
       \ '-buffer-name=', '-no-quit', '-toggle', '-create',
-      \ '-simple', '-double', '-split', '-direction=',
-      \ '-winwidth=', '-winminwidth=',
+      \ '-simple', '-double', '-split', '-horizontal', '-direction=',
+      \ '-winwidth=', '-winminwidth=', '-auto-cd',
       \]
 
 augroup vimfiler"{{{
@@ -91,13 +91,12 @@ function! vimfiler#default_settings()"{{{
   call vimfiler#mappings#define_default_mappings()
 endfunction"}}}
 function! vimfiler#set_execute_file(exts, command)"{{{
-  for ext in split(a:exts, ',')
-    let g:vimfiler_execute_file_list[ext] = a:command
-  endfor
+  return vimfiler#util#set_dictionary_helper(g:vimfiler_execute_file_list,
+        \ a:exts, a:command)
 endfunction"}}}
 function! vimfiler#set_extensions(kind, exts)"{{{
   let g:vimfiler_extensions[a:kind] = {}
-  for ext in split(a:exts, ',')
+  for ext in split(a:exts, '\s*,\s*')
     let g:vimfiler_extensions[a:kind][ext] = 1
   endfor
 endfunction"}}}
@@ -135,52 +134,22 @@ endfunction"}}}
 function! vimfiler#get_options()"{{{
   return copy(s:vimfiler_options)
 endfunction"}}}
-function! vimfiler#create_filer(path, ...)"{{{
-  let path = a:path
-  if path == ''
-    let path = vimfiler#util#substitute_path_separator(getcwd())
-  elseif vimfiler#util#is_win_path(path)
-    let path = vimfiler#util#substitute_path_separator(
-          \ fnamemodify(vimfiler#util#expand(path), ':p'))
-  endif
-
-  let context = vimfiler#init_context(get(a:000, 0, {}))
-  if &l:modified && !&l:hidden
-    " Split automatically.
-    let context.split = 1
-  endif
-
-  " Create new buffer name.
-  let prefix = vimfiler#util#is_win() ? '[vimfiler] - ' : '*vimfiler* - '
-  let prefix .= context.profile_name
-
-  let postfix = s:get_postfix(prefix, 1)
-
-  let bufname = prefix . postfix
-
-  " Set buffer_name.
-  let context.profile_name = context.buffer_name
-  let context.buffer_name = bufname
-
-  if context.split
-    execute context.direction 'vnew'
-  endif
-
-  silent edit `=bufname`
-
-  let context.path = path
-  " echomsg path
-
-  call vimfiler#handler#_event_handler('BufReadCmd', context)
-endfunction"}}}
 function! vimfiler#switch_filer(path, ...)"{{{
+  if vimfiler#util#is_cmdwin()
+    call vimfiler#print_error(
+          \ '[vimfiler] Command line buffer is detected!')
+    call vimfiler#print_error(
+          \ '[vimfiler] Please close command line buffer.')
+    return
+  endif
+
   let path = a:path
   if vimfiler#util#is_win_path(path)
     let path = vimfiler#util#substitute_path_separator(
           \ fnamemodify(vimfiler#util#expand(path), ':p'))
   endif
 
-  let context = vimfiler#init_context(get(a:000, 0, {}))
+  let context = vimfiler#initialize_context(get(a:000, 0, {}))
   if &l:modified && !&l:hidden
     " Split automatically.
     let context.split = 1
@@ -210,7 +179,45 @@ function! vimfiler#switch_filer(path, ...)"{{{
   endif
 
   " Create window.
-  call vimfiler#create_filer(path, context)
+  call s:create_filer(path, context)
+endfunction"}}}
+function! s:create_filer(path, context)"{{{
+  let path = a:path
+  if path == ''
+    " Use current directory.
+    let path = vimfiler#util#substitute_path_separator(getcwd())
+  endif
+
+  if &l:modified && !&l:hidden
+    " Split automatically.
+    let a:context.split = 1
+  endif
+
+  " Create new buffer name.
+  let prefix = vimfiler#util#is_windows() ?
+        \ '[vimfiler] - ' : '*vimfiler* - '
+  let prefix .= a:context.profile_name
+
+  let postfix = s:get_postfix(prefix, 1)
+
+  let bufname = prefix . postfix
+
+  " Set buffer_name.
+  let a:context.profile_name = a:context.buffer_name
+  let a:context.buffer_name = bufname
+
+  if a:context.horizontal && a:context.split
+    execute a:context.direction 'new'
+  elseif a:context.split
+    execute a:context.direction 'vnew'
+  endif
+
+  silent edit `=bufname`
+
+  let a:context.path = path
+  " echomsg path
+
+  call vimfiler#handler#_event_handler('BufReadCmd', a:context)
 endfunction"}}}
 function! vimfiler#get_directory_files(directory, ...)"{{{
   " Save current files.
@@ -279,7 +286,14 @@ function! vimfiler#redraw_screen()"{{{
     " Switch vimfiler.
     let vimfiler = vimfiler#get_current_vimfiler()
 
-    execute vimfiler.winnr . 'wincmd w'
+    let save_winnr = winnr()
+    let winnr = bufwinnr(vimfiler.bufnr)
+    if winnr < 0
+      " Not vimfiler window.
+      return
+    endif
+
+    execute winnr . 'wincmd w'
   endif
 
   if !has_key(b:vimfiler, 'original_files')
@@ -321,10 +335,14 @@ function! vimfiler#redraw_screen()"{{{
   setlocal nomodifiable
 
   if is_switch
-    wincmd p
+    execute save_winnr . 'wincmd w'
   endif
 endfunction"}}}
 function! vimfiler#redraw_prompt()"{{{
+  if &filetype !=# 'vimfiler'
+    return
+  endif
+
   let modifiable_save = &l:modifiable
   setlocal modifiable
   let mask = !b:vimfiler.is_visible_dot_files && b:vimfiler.current_mask == '' ?
@@ -333,7 +351,7 @@ function! vimfiler#redraw_prompt()"{{{
 
   let dir = b:vimfiler.current_dir
   if b:vimfiler.source ==# 'file'
-    let home = unite#util#substitute_path_separator(expand('~')).'/'
+    let home = vimfiler#util#substitute_path_separator(expand('~')).'/'
     if stridx(dir, home) >= 0
       let dir = '~/' . dir[len(home):]
     endif
@@ -357,14 +375,10 @@ function! vimfiler#force_system(str, ...)"{{{
 
   let command = a:str
   let input = join(a:000)
-  if &termencoding != '' && &termencoding != &encoding
-    let command = iconv(command, &encoding, &termencoding)
-    let input = iconv(input, &encoding, &termencoding)
-  endif
+  let command = iconv(command, &encoding, 'char')
+  let input = iconv(input, &encoding, 'char')
   let output = (a:0 == 0)? system(command) : system(command, input)
-  if &termencoding != '' && &termencoding != &encoding
-    let output = iconv(output, &termencoding, &encoding)
-  endif
+  let output = iconv(output, 'char', &encoding)
   return output
 endfunction"}}}
 function! vimfiler#get_system_error()"{{{
@@ -494,7 +508,7 @@ endfunction"}}}
 function! vimfiler#get_filetype(file)"{{{
   let ext = tolower(a:file.vimfiler__extension)
 
-  if (vimfiler#util#is_win() && ext ==? 'LNK')
+  if (vimfiler#util#is_windows() && ext ==? 'LNK')
         \ || get(a:file, 'vimfiler__ftype', '') ==# 'link'
     " Symbolic link.
     return '[LNK]'
@@ -608,7 +622,7 @@ function! vimfiler#get_another_vimfiler()"{{{
         \ getbufvar(b:vimfiler.another_vimfiler_bufnr, 'vimfiler') : ''
 endfunction"}}}
 function! vimfiler#resolve(filename)"{{{
-  return ((vimfiler#util#is_win() && fnamemodify(a:filename, ':e') ==? 'LNK') || getftype(a:filename) ==# 'link') ?
+  return ((vimfiler#util#is_windows() && fnamemodify(a:filename, ':e') ==? 'LNK') || getftype(a:filename) ==# 'link') ?
         \ vimfiler#util#substitute_path_separator(resolve(a:filename)) : a:filename
 endfunction"}}}
 function! vimfiler#print_error(message)"{{{
@@ -634,7 +648,7 @@ function! vimfiler#parse_path(path)"{{{
   let path = a:path
 
   let source_name = matchstr(path, '^\h[^:]*\ze:')
-  if (vimfiler#util#is_win() && len(source_name) == 1)
+  if (vimfiler#util#is_windows() && len(source_name) == 1)
         \ || source_name == ''
     " Default source.
     let source_name = 'file'
@@ -653,42 +667,28 @@ function! vimfiler#parse_path(path)"{{{
 
   return insert(source_args, source_name)
 endfunction"}}}
-function! vimfiler#init_context(context)"{{{
-  if !has_key(a:context, 'buffer_name')
-    let a:context.buffer_name = 'default'
-  endif
-  if !has_key(a:context, 'profile_name')
-    let a:context.profile_name = a:context.buffer_name
-  endif
-  if !has_key(a:context, 'no_quit')
-    let a:context.no_quit = 0
-  endif
-  if !has_key(a:context, 'toggle')
-    let a:context.toggle = 0
-  endif
-  if !has_key(a:context, 'create')
-    let a:context.create = 0
-  endif
-  if !has_key(a:context, 'simple')
-    let a:context.simple = 0
-  endif
-  if !has_key(a:context, 'double')
-    let a:context.double = 0
-  endif
-  if !has_key(a:context, 'split')
-    let a:context.split = 0
-  endif
-  if !has_key(a:context, 'winwidth')
-    let a:context.winwidth = 0
-  endif
-  if !has_key(a:context, 'winminwidth')
-    let a:context.winminwidth = 0
-  endif
-  if !has_key(a:context, 'direction')
-    let a:context.direction = g:vimfiler_split_rule
+function! vimfiler#initialize_context(context)"{{{
+  let default_context = {
+    \ 'buffer_name' : 'default',
+    \ 'no_quit' : 0,
+    \ 'toggle' : 0,
+    \ 'create' : 0,
+    \ 'simple' : 0,
+    \ 'double' : 0,
+    \ 'split' : 0,
+    \ 'horizontal' : 0,
+    \ 'winwidth' : 0,
+    \ 'winminwidth' : 0,
+    \ 'direction' : g:vimfiler_split_rule,
+    \ 'auto_cd' : g:vimfiler_enable_auto_cd,
+    \ }
+  let context = extend(default_context, a:context)
+
+  if !has_key(context, 'profile_name')
+    let context.profile_name = context.buffer_name
   endif
 
-  return a:context
+  return context
 endfunction"}}}
 function! vimfiler#get_histories()"{{{
   return copy(s:vimfiler_current_histories)
@@ -751,9 +751,9 @@ function! vimfiler#close(buffer_name)"{{{
   let buffer_name = a:buffer_name
   if buffer_name !~ '@\d\+$'
     " Add postfix.
-    let prefix = vimfiler#util#is_win() ? '[vimfiler] - ' : '*vimfiler* - '
+    let prefix = vimfiler#util#is_windows() ? '[vimfiler] - ' : '*vimfiler* - '
     let prefix .= buffer_name
-    let buffer_name .= s:get_postfix(prefix, 0)
+    let buffer_name = prefix . s:get_postfix(prefix, 0)
   endif
 
   " Note: must escape file-pattern.
@@ -883,7 +883,10 @@ function! s:event_bufwin_enter(bufnr)"{{{
   let context = vimfiler#get_context()
   if context.winwidth != 0
     execute 'vertical resize' context.winwidth
-    setlocal winfixwidth
+
+    if context.split
+      setlocal winfixwidth
+    endif
   endif
 
   let winwidth = (winwidth(0)+1)/2*2
@@ -904,9 +907,11 @@ function! s:event_bufwin_leave(bufnr)"{{{
 endfunction"}}}
 
 function! vimfiler#_switch_vimfiler(bufnr, context, directory)"{{{
-  let context = vimfiler#init_context(a:context)
+  let context = vimfiler#initialize_context(a:context)
 
-  if context.split
+  if context.horizontal && context.split
+    execute context.direction 'new'
+  elseif context.split
     execute context.direction 'vnew'
   endif
 
@@ -944,10 +949,10 @@ function! s:get_postfix(prefix, is_create)
     let tabnr = 1
     while tabnr <= tabpagenr('$')
       let buflist = map(tabpagebuflist(tabnr), 'bufname(v:val)')
-      if index(buflist, a:prefix.postfix) >= 0
+      while index(buflist, a:prefix.postfix) >= 0
         let cnt += 1
         let postfix = '@' . cnt
-      endif
+      endwhile
 
       let tabnr += 1
     endwhile

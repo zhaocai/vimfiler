@@ -1,7 +1,7 @@
 "=============================================================================
 " FILE: handler.vim
 " AUTHOR: Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 23 Jan 2012.
+" Last Modified: 16 Mar 2012.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -26,8 +26,9 @@
 
 
 function! vimfiler#handler#_event_handler(event_name, ...)  "{{{1
-  let context = vimfiler#init_context(get(a:000, 0, {}))
-  let path = get(context, 'path', expand('<afile>'))
+  let context = vimfiler#initialize_context(get(a:000, 0, {}))
+  let path = get(context, 'path',
+        \ vimfiler#util#substitute_path_separator(expand('<afile>')))
 
   let ret = vimfiler#parse_path(path)
   let source_name = ret[0]
@@ -52,7 +53,6 @@ function! s:on_BufReadCmd(source_name, source_args, context)  "{{{1
   let b:vimfiler.source = a:source_name
   let b:vimfiler.context = a:context
   let b:vimfiler.bufnr = bufnr('%')
-  let b:vimfiler.winnr = winnr()
   if type ==# 'directory'
     call s:initialize_vimfiler_directory(info, a:context)
   elseif type ==# 'file'

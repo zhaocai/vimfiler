@@ -1,7 +1,7 @@
 "=============================================================================
 " FILE: mappings.vim
 " AUTHOR: Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 23 Jan 2012.
+" Last Modified: 10 Apr 2012.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -115,7 +115,7 @@ function! vimfiler#mappings#define_default_mappings()"{{{
   nmap <buffer> <Plug>(vimfiler_cd)
         \ <Plug>(vimfiler_cd_vim_current_dir)
   nnoremap <buffer><silent> <Plug>(vimfiler_cd_vim_current_dir)
-        \ :<C-u>call <SID>change_vim_current_dir(b:vimfiler.current_dir)<CR>
+        \ :<C-u>call <SID>change_vim_current_dir()<CR>
   nnoremap <buffer><silent> <Plug>(vimfiler_cd_file)
         \ :<C-u>call <SID>change_directory_file()<CR>
   nnoremap <buffer><silent> <Plug>(vimfiler_choose_action)
@@ -233,7 +233,7 @@ function! vimfiler#mappings#define_default_mappings()"{{{
   nmap <buffer> gf <Plug>(vimfiler_find)
   nmap <buffer> S <Plug>(vimfiler_select_sort_type)
   nmap <buffer> <C-v> <Plug>(vimfiler_switch_vim_buffer_mode)
-  nmap <buffer> gc <Plug>(vimfiler_cd)
+  nmap <buffer> gc <Plug>(vimfiler_cd_vim_current_dir)
   nmap <buffer> gs <Plug>(vimfiler_toggle_safe_mode)
   nmap <buffer> gS <Plug>(vimfiler_toggle_simple_mode)
   nmap <buffer> gg <Plug>(vimfiler_cursor_top)
@@ -326,7 +326,7 @@ function! vimfiler#mappings#cd(dir, ...)"{{{
   let current_dir = b:vimfiler.current_dir
 
   if dir == '..'
-    if unite#util#is_win() && current_dir =~ '^//'
+    if vimfiler#util#is_windows() && current_dir =~ '^//'
       " For UNC path.
       let current_dir = substitute(current_dir,
             \ '^//[^/]*/[^/]*', '', '')
@@ -353,11 +353,11 @@ function! vimfiler#mappings#cd(dir, ...)"{{{
   elseif dir == '/'
     " Root.
 
-    if unite#util#is_win() && current_dir =~ '^//'
+    if vimfiler#util#is_windows() && current_dir =~ '^//'
       " For UNC path.
       let dir = matchstr(current_dir, '^//[^/]*/[^/]*')
     else
-      let dir = vimfiler#util#is_win() ?
+      let dir = vimfiler#util#is_windows() ?
             \ matchstr(fnamemodify(current_dir, ':p'),
             \         '^\a\+:[/\\]') : dir
     endif
@@ -365,8 +365,8 @@ function! vimfiler#mappings#cd(dir, ...)"{{{
     " Home.
     let dir = expand('~')
   elseif dir =~ ':'
-        \ || (vimfiler#util#is_win() && dir =~ '^//')
-        \ || (!vimfiler#util#is_win() && dir =~ '^/')
+        \ || (vimfiler#util#is_windows() && dir =~ '^//')
+        \ || (!vimfiler#util#is_windows() && dir =~ '^/')
     " Network drive or absolute path.
   else
     " Relative path.
@@ -374,7 +374,7 @@ function! vimfiler#mappings#cd(dir, ...)"{{{
   endif
   let fullpath = vimfiler#util#substitute_path_separator(dir)
 
-  if vimfiler#util#is_win()
+  if vimfiler#util#is_windows()
     let fullpath = vimfiler#resolve(fullpath)
   endif
 
@@ -388,6 +388,10 @@ function! vimfiler#mappings#cd(dir, ...)"{{{
         \ deepcopy(save_pos)
   let prev_dir = b:vimfiler.current_dir
   let b:vimfiler.current_dir = fullpath
+
+  if vimfiler#get_context().auto_cd
+    call s:change_vim_current_dir()
+  endif
 
   " Save changed directories.
   if save_history
@@ -484,7 +488,6 @@ function! s:switch_no_quit()"{{{
   let context = vimfiler#get_context()
   if context.no_quit
     let vimfiler = vimfiler#get_current_vimfiler()
-    let vimfiler.winnr = winnr()
 
     call vimfiler#set_current_vimfiler(vimfiler)
 
@@ -814,7 +817,7 @@ function! s:edit_binary_file()"{{{
 
   call s:switch_no_quit()
 
-  Vinarise `=vimfiler#get_filename()`
+  execute 'Vinarise' escape(vimfiler#get_filename(), ' ')
 endfunction"}}}
 function! s:execute_shell_command()"{{{
   echo 'Marked files:'
@@ -936,6 +939,10 @@ endfunction"}}}
 function! s:choose_action()"{{{
   let marked_files = vimfiler#get_marked_files()
   if empty(marked_files)
+    if empty(vimfiler#get_file())
+      return
+    endif
+
     let marked_files = [ vimfiler#get_file() ]
   endif
 
@@ -1060,6 +1067,8 @@ endfunction"}}}
 function! s:new_file()"{{{
   let directory = vimfiler#get_file_directory()
 
+  call s:switch_no_quit()
+
   call vimfiler#mappings#do_dir_action('vimfiler__newfile', directory)
   silent call vimfiler#force_redraw_all_vimfiler()
 endfunction"}}}
@@ -1102,20 +1111,13 @@ endfunction"}}}
 function! s:execute_external_filer()"{{{
   call vimfiler#mappings#do_current_dir_action('vimfiler__execute')
 endfunction"}}}
-function! s:change_vim_current_dir(directory)"{{{
-  let dummy_files = unite#get_vimfiler_candidates(
-        \ [['file', a:directory]], {
-        \ 'vimfiler__is_dummy' : 1,
-        \ 'vimfiler__current_directory' : b:vimfiler.current_dir,
-        \ })
-  if empty(dummy_files)
+function! s:change_vim_current_dir()"{{{
+  if b:vimfiler.source !=# 'file'
+    call vimfiler#print_error('Invalid operation in not file source.')
     return
   endif
 
-  " Execute cd.
-  call unite#mappings#do_action('cd', dummy_files, {
-        \ 'vimfiler__current_directory' : b:vimfiler.current_dir,
-        \ })
+  execute g:unite_kind_openable_lcd_command '`=b:vimfiler.current_dir`'
 endfunction"}}}
 function! s:grep()"{{{
   call s:switch_no_quit()
